@@ -1,0 +1,89 @@
+library(tidyverse)
+library(data.table)
+library(zoo)
+
+CPI_or_HICP_idbanks <- tribble(~ IDBANK, ~ CPI_or_HICP,
+                               "001759970", "CPI", # Monthly CPI
+                               "001759971", "HICP" # Monthly HICP
+)
+
+min_date <- as.Date("1999-01-01")
+max_date <- as.Date("2024-06-01")
+
+indicefp <- fread("https://www.ipp.eu/wp-content/themes/ipp/baremes/marche-du-travail/remuneration_dans_fonction_publique/indicefp/indicefp.csv") |>
+  mutate(date = as.Date(date)) |>
+  arrange(desc(date)) |>
+  # Add today's date to be equal ------
+slice(1, 1:n()) |>
+  mutate(date = ifelse(row_number() == 1, Sys.Date(), date)) |>
+  mutate(date = as.Date(date))
+
+
+figureA2_idbanks <- tribble(~ IDBANK, ~ gross_or_net,
+                            "001572130", "gross index", # https://www.insee.fr/fr/statistiques/serie/001572130
+                            "001572134", "net index"   # https://www.insee.fr/fr/statistiques/serie/001572134
+)
+
+CPI_or_HICP <- CPI_or_HICP_idbanks |>
+  mutate(data = map(IDBANK, ~ paste0("https://www.bdm.insee.fr/series/sdmx/data/SERIES_BDM/", .) |>
+                      rsdmx::readSDMX() |>
+                      as_tibble() |>
+                      transmute(date = as.Date(paste0(TIME_PERIOD, "-01")),
+                                OBS_VALUE = as.numeric(OBS_VALUE)))) |>
+  unnest(cols = c(data)) |>
+  select(-IDBANK) |>
+  spread(CPI_or_HICP, OBS_VALUE)
+
+net_gross_monthly <- figureA2_idbanks |>
+  mutate(data = map(IDBANK, ~ paste0("https://www.bdm.insee.fr/series/sdmx/data/SERIES_BDM/", .) |>
+                      rsdmx::readSDMX() |>
+                      as_tibble()  |> 
+                      transmute(date = as.Date(zoo::as.yearqtr(TIME_PERIOD, format = "%Y-Q%q")),
+                                OBS_VALUE = as.numeric(OBS_VALUE)))) |>
+  unnest(cols = c(data)) |>
+  select(-IDBANK) |>
+  spread(gross_or_net, OBS_VALUE) |>
+  transmute(date, net_gross = `net index`/`gross index`) |>
+  slice(1, 1:n(), n()) |>
+  mutate(date = case_when(row_number() == n() ~ Sys.Date(),
+                          row_number() == 1 ~ min_date,
+                          TRUE ~ date)) |>
+  complete(date = seq.Date(min(date), max(date), by = "month")) |>
+  fill(net_gross)
+
+
+figureA2 <- indicefp |>
+  select(date, value = point_indice_en_euros) |>
+  arrange(desc(date)) |>
+  complete(date = seq.Date(min(date), max(date), by = "month")) |>
+  fill(value) |>
+  left_join(CPI_or_HICP, by = "date") |>
+  left_join(net_gross_monthly, by = "date") |>
+  filter(date >= min_date,
+         date <= max_date) |>
+  transmute(date,
+            HICP = (value/value[1])*(HICP[1]/HICP)*net_gross,
+            CPI = (value/value[1])*(CPI[1]/CPI)*net_gross) |>
+  gather(variable, OBS_VALUE, -date)
+
+figureA2 |>
+  ggplot() + geom_line(aes(x = date, y = OBS_VALUE, color = variable)) + theme_minimal() +
+  scale_x_date(breaks = as.Date(paste0(c(seq(1999, 2100, 5), seq(1997, 2100, 5)), "-01-01")),
+               labels = scales::date_format("%Y")) +
+  theme(legend.position = c(0.43, 0.12),
+        legend.title = element_blank()) +
+  scale_y_log10(breaks = seq(1, 0.02, -0.02),
+                labels = scales::percent(seq(1, 0.02, -0.02)-1, acc = 1)) + 
+  ylab("") + xlab("") +
+  geom_text(data = figureA2 |> 
+              filter((year(date) %in% seq(2009, 2019, 5) & month(date) == 1)),
+            aes(x = date, y = OBS_VALUE, label = scales::percent(OBS_VALUE-1, acc = 0.1)), 
+            fontface ="bold", color = "black", size = 3) +
+  geom_label(data = filter(figureA2, date == max(date)),
+             aes(x = date, y = OBS_VALUE, label = scales::percent(OBS_VALUE-1, acc = 0.1), color = variable), 
+             fontface ="bold", size = 3) +
+  labs(caption = "Source: Insee, IPP scales, author’s calculations")
+
+ggsave("figureA2.png", width = 1.25*6, height = 1.25*3.375, bg = "white")
+ggsave("figureA2.pdf", width = 1.25*6, height = 1.25*3.375)
+
