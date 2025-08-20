@@ -6,7 +6,7 @@ This repository provides replication codes for the [linked note](https://fgeerol
 
 The repository contains everything needed to replicate the figures and data from the [linked note](https://fgeerolf.com/CPI-or-HICP.pdf):
 
-### Table 1. Inflation according to the CPI or the HICP.
+### Table 1. Inflation according to the CPI or the HICP
 
 [R Code](table1.R)
 
@@ -18,23 +18,24 @@ The repository contains everything needed to replicate the figures and data from
 
 ![Figure 1](figure1.png)
 
-### Figure 2. Evolution of annual wages “in constant euros” by socio-professional category, using CPI inflation and using HICP inflation.
+### Figure 2. Evolution of annual wages “in constant euros” by socio-professional category, using CPI inflation and using HICP inflation
 
 [R Code](figure2.R)
 
 ![Figure 2](figure2.png)
 
-### Figure A1 : Poids de l’enseignement dans l’IPC et dans l’IPCH.
+
+### Figure A1: Weight of education in the CPI and in the HICP
 
 [Code R](figureA1.R)
 
 ![FigureA1](figureA1.png)
 
-### Figure A2 : Pouvoir d’achat du point d’indice net de la fonction publique, IPC vs. IPCH.
+### Figure A2: Purchasing power of the civil service net index point, CPI vs. HICP
 
 [Code R](figureA2.R)
 
 ![FigureA2](figureA2.png)
 
-## Outils pour calculer des évolutions en euros constants
+
 
